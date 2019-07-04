@@ -87,18 +87,23 @@ def main(ctx, src, verbose):
 
 @main.command()
 @click.option('-R', '--repository')
+@click.option('-r', '--ref')
 @click.option('-C', '--changedir')
 @click.option('-n', '--name')
 @click.argument('alias')
 @click.pass_context
-def add(ctx, repository, changedir, name, alias):
+def add(ctx, repository, ref, changedir, name, alias):
     ctx = ctx.obj
 
     with Directory(changedir=changedir, repository=repository) as path:
         alias = pathlib.Path(path) / alias
 
         if repository:
+            LOG.info('cloning %s', repository)
             ctx.git('clone', repository, path)
+            if ref:
+                LOG.info('checking out %s', ref)
+                ctx.git('-C', path, 'checkout', ref)
 
         with alias.open() as fd:
             content = fd.read()
