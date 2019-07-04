@@ -48,23 +48,38 @@ def Directory(changedir=None, repository=None):
         sh.rm('-rf', path)
 
 
-@click.group()
-@click.option('-s', '--system', 'target', is_flag=True,
-              flag_value=Target.SYSTEM)
-@click.option('-g', '--global', 'target', is_flag=True,
-              flag_value=Target.GLOBAL)
-@click.option('--local', 'target', is_flag=True, flag_value=Target.LOCAL,
-              default=True)
-@click.option('-w', '--worktree', 'target', is_flag=True,
-              flag_value=Target.WORKTREE)
-@click.option('-f', '--file', 'target', default=Target.GLOBAL)
-@click.option('-v', '--verbose', count=True)
+@click.group(context_settings=dict(auto_envvar_prefix='GIT_ALIAS'))
+@click.option('-s', '--system', 'target',
+              is_flag=True,
+              flag_value=Target.SYSTEM,
+              help='Manage aliases in system configuration (/etc/gitconfig)')
+@click.option('-g', '--global', 'target',
+              is_flag=True,
+              flag_value=Target.GLOBAL,
+              help='Manage aliases in global configuration (~/.gitconfig)')
+@click.option('-l', '--local', 'target',
+              is_flag=True,
+              flag_value=Target.LOCAL,
+              help='Manage aliases in local configuration (.git/config)')
+@click.option('-w', '--worktree', 'target',
+              is_flag=True,
+              flag_value=Target.WORKTREE,
+              help='Manage aliases in worktree configuration (.git/config.worktree)')  # noqa
+@click.option('-f', '--file', 'target',
+              default=Target.GLOBAL,
+              help='Manage aliases in the named file')
+@click.option('-v', '--verbose', type=int, count=True)
 @click.pass_context
 def main(ctx, target, verbose):
+    LOG.debug('using target %s', target)
     ctx.obj = Config(target=target)
     ctx.obj.git = sh.git.bake('--no-pager')
 
-    loglevel = ['WARNING', 'INFO', 'DEBUG'][verbose]
+    try:
+        loglevel = ['WARNING', 'INFO', 'DEBUG'][verbose]
+    except IndexError:
+        loglevel = 'DEBUG'
+
     logging.basicConfig(
         level=loglevel
     )
