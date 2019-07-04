@@ -21,7 +21,9 @@ class Config:
         return str(self.__dict__)
 
 
-class source_flags(Enum):
+class Target(Enum):
+    '''Constants that correspond to git config's --system, --global,
+    --local, and --worktree command line options.'''
     SYSTEM = 1
     GLOBAL = 2
     LOCAL = 3
@@ -41,22 +43,25 @@ def Directory(changedir=None, repository=None):
 
     yield path
 
+    # pylint: disable=no-member
     if cleanup:
         sh.rm('-rf', path)
 
 
 @click.group()
-@click.option('-s', '--system', 'src', is_flag=True, flag_value=source_flags.SYSTEM)
-@click.option('-g', '--global', 'src', is_flag=True, flag_value=source_flags.GLOBAL)
-@click.option('--local', 'src', is_flag=True, flag_value=source_flags.LOCAL,
+@click.option('-s', '--system', 'target', is_flag=True,
+              flag_value=Target.SYSTEM)
+@click.option('-g', '--global', 'target', is_flag=True,
+              flag_value=Target.GLOBAL)
+@click.option('--local', 'target', is_flag=True, flag_value=Target.LOCAL,
               default=True)
-@click.option('-w', '--worktree', 'src', is_flag=True,
-              flag_value=source_flags.WORKTREE)
-@click.option('-f', '--file', 'src', default=source_flags.GLOBAL)
+@click.option('-w', '--worktree', 'target', is_flag=True,
+              flag_value=Target.WORKTREE)
+@click.option('-f', '--file', 'target', default=Target.GLOBAL)
 @click.option('-v', '--verbose', count=True)
 @click.pass_context
-def main(ctx, src, verbose):
-    ctx.obj = Config(src=src)
+def main(ctx, target, verbose):
+    ctx.obj = Config(target=target)
     ctx.obj.git = sh.git.bake('--no-pager')
 
     loglevel = ['WARNING', 'INFO', 'DEBUG'][verbose]
@@ -71,28 +76,28 @@ def main(ctx, src, verbose):
         sh_logger.setLevel('WARNING')
 
     args = []
-    if src is source_flags.SYSTEM:
+    if target is Target.SYSTEM:
         args.append('--system')
-    elif src is source_flags.GLOBAL:
+    elif target is Target.GLOBAL:
         args.append('--global')
-    elif src is source_flags.LOCAL:
+    elif target is Target.LOCAL:
         args.append('--local')
-    elif src is source_flags.WORKTREE:
+    elif target is Target.WORKTREE:
         args.append('--worktree')
     else:
-        args.extend(('--file', src))
+        args.extend(('--file', target))
 
     ctx.obj.conf = sh.git.bake('--no-pager', 'config', *args)
 
 
-@main.command()
+@main.command(name='add')
 @click.option('-R', '--repository')
 @click.option('-r', '--ref')
 @click.option('-C', '--changedir')
 @click.option('-n', '--name')
 @click.argument('alias')
 @click.pass_context
-def add(ctx, repository, ref, changedir, name, alias):
+def alias_add(ctx, repository, ref, changedir, name, alias):
     ctx = ctx.obj
 
     with Directory(changedir=changedir, repository=repository) as path:
@@ -118,13 +123,10 @@ def add(ctx, repository, ref, changedir, name, alias):
     ctx.conf('alias.{}'.format(name), content)
 
 
-
-@main.command()
+@main.command(name='list')
 @click.pass_context
-def list(ctx):
+def alias_list(ctx):
     ctx = ctx.obj
-
-    src = ctx.src
 
     list_res = ctx.conf('--list', '--name-only')
     for line in list_res.stdout.decode().splitlines():
@@ -136,13 +138,14 @@ def list(ctx):
         print(alias_name)
 
 
-@main.command()
+@main.command(name='show')
 @click.argument('alias')
 @click.pass_context
-def show(ctx, alias):
+def alias_show(ctx, alias):
     ctx = ctx.obj
     res = ctx.conf('--get', 'alias.{}'.format(alias))
     print(res.stdout.decode())
+
 
 @main.command()
 @click.argument('alias')
@@ -152,6 +155,6 @@ def remove(ctx, alias):
     LOG.info('removing alias %s', alias)
     try:
         ctx.conf('--unset', 'alias.{}'.format(alias))
+    # pylint: disable=no-member
     except sh.ErrorReturnCode_5:
         LOG.warning('failed to remove alias %s (does not exist)', alias)
-
