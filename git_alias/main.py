@@ -48,7 +48,35 @@ def Directory(changedir=None, repository=None):
         sh.rm('-rf', path)
 
 
-@click.group(context_settings=dict(auto_envvar_prefix='GIT_ALIAS'))
+class AliasCommand(click.Command):
+    def __init__(self, *args, aliases=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.aliases = set(aliases) if aliases else set()
+
+
+class AliasGroup(click.Group):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.aliases = {}
+
+    def get_command(self, ctx, name):
+        res = super().get_command(ctx, name)
+        if res:
+            return res
+
+        return self.aliases.get(name)
+
+    def add_command(self, cmd, name=None):
+        super().add_command(cmd, name=name)
+
+        aliases = getattr(cmd, 'aliases', [])
+        for alias in aliases:
+            self.aliases[alias] = cmd
+
+
+@click.command(cls=AliasGroup,
+               context_settings=dict(auto_envvar_prefix='GIT_ALIAS'))
 @click.option('-s', '--system', 'target',
               is_flag=True,
               flag_value=Target.SYSTEM,
@@ -146,7 +174,7 @@ def alias_add(ctx, repository, ref, changedir, name, alias):
     ctx.conf('alias.{}'.format(name), content)
 
 
-@main.command(name='list')
+@main.command(cls=AliasCommand, name='list', aliases=['ls'])
 @click.pass_context
 def alias_list(ctx):
     ctx = ctx.obj
@@ -161,7 +189,7 @@ def alias_list(ctx):
         print(alias_name)
 
 
-@main.command(name='show')
+@main.command(cls=AliasCommand, name='show', aliases=['cat'])
 @click.argument('alias')
 @click.pass_context
 def alias_show(ctx, alias):
@@ -170,10 +198,10 @@ def alias_show(ctx, alias):
     print(res.stdout.decode())
 
 
-@main.command()
+@main.command(cls=AliasCommand, name='remove', aliases=['rm'])
 @click.argument('alias')
 @click.pass_context
-def remove(ctx, alias):
+def alias_remove(ctx, alias):
     ctx = ctx.obj
     LOG.info('removing alias %s', alias)
     try:
