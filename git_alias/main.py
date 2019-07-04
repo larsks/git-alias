@@ -106,7 +106,7 @@ def add(ctx, repository, ref, changedir, name, alias):
                 ctx.git('-C', path, 'checkout', ref)
 
         with alias.open() as fd:
-            content = fd.read()
+            content = fd.read().strip()
 
     if name is None:
         if alias.name.endswith('.alias'):
