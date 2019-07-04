@@ -1,5 +1,4 @@
 import contextlib
-from enum import Enum
 import logging
 import pathlib
 import tempfile
@@ -8,28 +7,10 @@ import sh
 import click
 
 import git_alias
+from git_alias.git import Git
+from git_alias.git import Target
 
 LOG = logging.getLogger(__name__)
-
-
-class Config:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-    def __repr__(self):
-        return repr(self.__dict__)
-
-    def __str__(self):
-        return str(self.__dict__)
-
-
-class Target(Enum):
-    '''Constants that correspond to git config's --system, --global,
-    --local, and --worktree command line options.'''
-    SYSTEM = 1
-    GLOBAL = 2
-    LOCAL = 3
-    WORKTREE = 4
 
 
 @contextlib.contextmanager
@@ -62,12 +43,12 @@ class AliasGroup(click.Group):
 
         self.aliases = {}
 
-    def get_command(self, ctx, name):
-        res = super().get_command(ctx, name)
+    def get_command(self, ctx, cmd_name):
+        res = super().get_command(ctx, cmd_name)
         if res:
             return res
 
-        return self.aliases.get(name)
+        return self.aliases.get(cmd_name)
 
     def add_command(self, cmd, name=None):
         super().add_command(cmd, name=name)
@@ -103,8 +84,7 @@ class AliasGroup(click.Group):
 @click.pass_context
 def main(ctx, target, verbose):
     LOG.debug('using target %s', target)
-    ctx.obj = Config(target=target)
-    ctx.obj.git = sh.git.bake('--no-pager')
+    ctx.obj = Git(target)
 
     try:
         loglevel = ['WARNING', 'INFO', 'DEBUG'][verbose]
@@ -121,20 +101,6 @@ def main(ctx, target, verbose):
         sh_logger = logging.getLogger('sh')
         sh_logger.setLevel('WARNING')
 
-    args = []
-    if target is Target.SYSTEM:
-        args.append('--system')
-    elif target is Target.GLOBAL:
-        args.append('--global')
-    elif target is Target.LOCAL:
-        args.append('--local')
-    elif target is Target.WORKTREE:
-        args.append('--worktree')
-    else:
-        args.extend(('--file', target))
-
-    ctx.obj.conf = sh.git.bake('--no-pager', 'config', *args)
-
 
 @main.command(name='add')
 @click.option('-R', '--repository')
@@ -144,17 +110,14 @@ def main(ctx, target, verbose):
 @click.argument('alias')
 @click.pass_context
 def alias_add(ctx, repository, ref, changedir, name, alias):
-    ctx = ctx.obj
+    api = ctx.obj
 
     with Directory(changedir=changedir, repository=repository) as path:
         alias = pathlib.Path(path) / alias
 
         if repository:
             LOG.info('cloning %s', repository)
-            ctx.git('clone', repository, path)
-            if ref:
-                LOG.info('checking out %s', ref)
-                ctx.git('-C', path, 'checkout', ref)
+            api.clone_repository(repository, path, ref=ref)
 
         with alias.open() as fd:
             content = []
@@ -174,41 +137,33 @@ def alias_add(ctx, repository, ref, changedir, name, alias):
             name = alias.name
 
     LOG.info('installing alias %s from %s', name, alias)
-    ctx.conf('alias.{}'.format(name), content)
+    api.set_alias(name, content)
 
 
 @main.command(cls=AliasCommand, name='list', aliases=['ls'])
 @click.pass_context
 def alias_list(ctx):
-    ctx = ctx.obj
+    api = ctx.obj
 
-    list_res = ctx.conf('--list', '--name-only')
-    for line in list_res.stdout.decode().splitlines():
-        path = line.split('.')
-        if path[0] != 'alias':
-            continue
-
-        alias_name = '.'.join(path[1:])
-        print(alias_name)
+    for alias in api.list_aliases():
+        print(alias)
 
 
 @main.command(cls=AliasCommand, name='show', aliases=['cat'])
 @click.argument('alias')
 @click.pass_context
 def alias_show(ctx, alias):
-    ctx = ctx.obj
-    res = ctx.conf('--get', 'alias.{}'.format(alias))
-    print(res.stdout.decode())
+    api = ctx.obj
+    print(api.get_alias(alias))
 
 
 @main.command(cls=AliasCommand, name='remove', aliases=['rm'])
 @click.argument('alias')
 @click.pass_context
 def alias_remove(ctx, alias):
-    ctx = ctx.obj
+    api = ctx.obj
     LOG.info('removing alias %s', alias)
     try:
-        ctx.conf('--unset', 'alias.{}'.format(alias))
-    # pylint: disable=no-member
-    except sh.ErrorReturnCode_5:
-        LOG.warning('failed to remove alias %s (does not exist)', alias)
+        api.remove_alias(alias)
+    except KeyError:
+        raise click.ClickException('alias {} does not exist'.format(alias))
