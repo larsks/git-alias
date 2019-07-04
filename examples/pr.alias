@@ -1,0 +1,2 @@
+!if [ $# -eq 1 ]; then set -- origin $1; elif [ $# -ne 2 ]; then echo 'Usage: git pr [<remote>] <pr>'; exit 2; fi; git fetch "${1}" "+pull/${2}/head:pull/${1}/${2}"; git log -1 "pull/${1}/${2}" #
+
