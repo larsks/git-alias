@@ -7,6 +7,8 @@ import tempfile
 import sh
 import click
 
+import git_alias
+
 LOG = logging.getLogger(__name__)
 
 
@@ -77,6 +79,7 @@ class AliasGroup(click.Group):
 
 @click.command(cls=AliasGroup,
                context_settings=dict(auto_envvar_prefix='GIT_ALIAS'))
+@click.version_option(version=git_alias.__version__)
 @click.option('-s', '--system', 'target',
               is_flag=True,
               flag_value=Target.SYSTEM,
