@@ -1,1 +1,3 @@
+# Use `git please` instead of `git push -f` to reduce the changes of
+# erroneously overwriting remote changes.
 push --force-with-lease

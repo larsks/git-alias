@@ -1,1 +1,2 @@
+# Use this to show files in conflict during a rebase operation.
 diff --name-only --diff-filter=U

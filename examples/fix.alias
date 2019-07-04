@@ -1,1 +1,3 @@
+# Updated the current commit with newly staged files without
+# editing the commit message.
 commit --amend --no-edit
