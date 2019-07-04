@@ -1,5 +1,23 @@
 # git-alias: manage your Git aliases
 
+`git-alias` is a tool for managing your git aliases.
+
+## Install
+
+To install a released version of `git-alias`:
+
+```
+pip install git-alias
+```
+
+Or to install straight from GitHub:
+
+```
+pip install git+https://github.com/larsks/git-alias
+```
+
+`git-alias` requires Python 3.7 or later.
+
 ## Managing aliases
 
 ### Listing aliases
