@@ -52,7 +52,7 @@ def Directory(changedir=None, repository=None):
               default=True)
 @click.option('-w', '--worktree', 'src', is_flag=True,
               flag_value=source_flags.WORKTREE)
-@click.option('-f', '--file', 'src', default=source_flags.LOCAL)
+@click.option('-f', '--file', 'src', default=source_flags.GLOBAL)
 @click.option('-v', '--verbose', count=True)
 @click.pass_context
 def main(ctx, src, verbose):
