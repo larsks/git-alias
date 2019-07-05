@@ -13,24 +13,6 @@ from git_alias.git import Target
 LOG = logging.getLogger(__name__)
 
 
-@contextlib.contextmanager
-def Directory(changedir=None, repository=None):
-    cleanup = False
-    path = '.'
-
-    if changedir is not None:
-        path = changedir
-    elif repository is not None:
-        cleanup = True
-        path = tempfile.mkdtemp(prefix='alias')
-
-    yield path
-
-    # pylint: disable=no-member
-    if cleanup:
-        sh.rm('-rf', path)
-
-
 class AliasCommand(click.Command):
     def __init__(self, *args, aliases=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,6 +38,31 @@ class AliasGroup(click.Group):
         aliases = getattr(cmd, 'aliases', [])
         for alias in aliases:
             self.aliases[alias] = cmd
+
+
+@contextlib.contextmanager
+def Directory(changedir=None, repository=None):
+    cleanup = False
+    path = '.'
+
+    if changedir is not None:
+        path = changedir
+    elif repository is not None:
+        cleanup = True
+        path = tempfile.mkdtemp(prefix='alias')
+
+    yield pathlib.Path(path)
+
+    # pylint: disable=no-member
+    if cleanup:
+        sh.rm('-rf', path)
+
+
+def globbed(patterns, prefix):
+    for pattern in patterns:
+        res = prefix.glob(pattern)
+        for match in res:
+            yield match
 
 
 @click.command(cls=AliasGroup,
@@ -107,37 +114,36 @@ def main(ctx, target, verbose):
 @click.option('-r', '--ref')
 @click.option('-C', '--changedir')
 @click.option('-n', '--name')
-@click.argument('alias')
+@click.argument('aliases', nargs=-1)
 @click.pass_context
-def alias_add(ctx, repository, ref, changedir, name, alias):
+def alias_add(ctx, repository, ref, changedir, name, aliases):
     api = ctx.obj
 
     with Directory(changedir=changedir, repository=repository) as path:
-        alias = pathlib.Path(path) / alias
-
         if repository:
             LOG.info('cloning %s', repository)
             api.clone_repository(repository, path, ref=ref)
 
-        with alias.open() as fd:
-            content = []
-            for line in fd:
-                if not line.strip():
-                    continue
-                if line.startswith('#'):
-                    continue
-                content.append(line.strip())
+        for alias in globbed(aliases, path):
+            with alias.open() as fd:
+                content = []
+                for line in fd:
+                    if not line.strip():
+                        continue
+                    if line.startswith('#'):
+                        continue
+                    content.append(line.strip())
 
-            content = ' '.join(content)
+                content = ' '.join(content)
 
-    if name is None:
-        if alias.name.endswith('.alias'):
-            name = alias.name[:-6]
-        else:
-            name = alias.name
+            if name is None:
+                if alias.name.endswith('.alias'):
+                    name = alias.name[:-6]
+                else:
+                    name = alias.name
 
-    LOG.info('installing alias %s from %s', name, alias)
-    api.set_alias(name, content)
+            LOG.info('installing alias %s from %s', name, alias)
+#           api.set_alias(name, content)
 
 
 @main.command(cls=AliasCommand, name='list', aliases=['ls'])

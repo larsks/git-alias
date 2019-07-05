@@ -63,8 +63,8 @@ class Git:
         if recurse:
             args.append('--recurse-submodules')
 
-        args.extend(url, path)
-        self.git('clone', *args)
+        args.extend((url, path))
+        self.git(*args)
 
         if ref is not None:
             self.git('-C', path, 'checkout', ref)
