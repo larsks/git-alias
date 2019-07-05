@@ -167,3 +167,18 @@ def alias_remove(ctx, alias):
         api.remove_alias(alias)
     except KeyError:
         raise click.ClickException('alias {} does not exist'.format(alias))
+
+
+@main.command(name='export')
+@click.option('-o', '--output-dir', default='.', type=pathlib.Path)
+@click.argument('aliases', nargs=-1)
+@click.pass_context
+def alias_export(ctx, output_dir, aliases):
+    api = ctx.obj
+    for alias in api.list_aliases():
+        if not aliases or alias in aliases:
+            aliasfile = output_dir / '{}.alias'.format(alias)
+            with aliasfile.open('w') as fd:
+                LOG.info('writing alias %s to file %s', alias, aliasfile)
+                fd.write(api.get_alias(alias))
+                fd.write('\n')
