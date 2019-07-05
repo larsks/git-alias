@@ -150,11 +150,14 @@ def alias_list(ctx):
 
 
 @main.command(cls=AliasCommand, name='show', aliases=['cat'])
+@click.option('-o', '--output-file', type=click.File(mode='w'))
 @click.argument('alias')
 @click.pass_context
-def alias_show(ctx, alias):
+def alias_show(ctx, output_file, alias):
     api = ctx.obj
-    print(api.get_alias(alias))
+    LOG.info('writing alias %s to file %s', alias,
+             output_file.name if output_file else '<stdout>')
+    print(api.get_alias(alias), file=output_file)
 
 
 @main.command(cls=AliasCommand, name='remove', aliases=['rm'])
